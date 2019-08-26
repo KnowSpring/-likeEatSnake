@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <style>
+        .map {
+            width: 800px;
+            height: 600px;
+            background: #ccc;
+            position: relative;
+
+        }
+    </style>
+</head>
+<body>
+<!--地图-->
+<div class="map"></div>
+<script>
+    //食物部分
+    (function () {
+        //食物构造函数
+        function Food(x, y, width, height, color) {
+            this.element = [];
+            this.x = x || 0;
+            this.y = y || 0;
+            this.width = width || 20;
+            this.height = height || 20;
+            this.color = color || "red";
+        }
+
+        window.Food = Food;//把构造函数Food暴露给函数外面
+        var elements = [];//用来保存食物的对象
+        //初始化食物
+        Food.prototype.init = function (map) {
+            //删除地图食物
+            remove();
+            //创建食物元素
+            var div = document.createElement("div");
+            div.style.width = this.width + "px";//this指的是实例化对象
+            div.style.height = this.height + "px";
+            div.style.backgroundColor = this.color;
+            div.style.position = "absolute";
+            this.y = parseInt(Math.random() * (map.offsetHeight / this.height)) * this.height;
+            this.x = parseInt(Math.random() * (map.offsetWidth / this.width)) * this.width;
+            div.style.top = this.y + "px";
+            div.style.left = this.x + "px";
+            map.appendChild(div);
+            elements.push(div);//把食物对象放在数组中
+        };
+        //移除地图中的食物和删除食物数组对象
+        function remove() {
+
+            for (var i = 0; i < elements.length; i++) {
+                var mapObj = elements[i].parentNode;
+                mapObj.removeChild(elements[i]);
+                elements.splice(i, 1);
+            }
+
+        }
+
+
+    }());
+    //小蛇部分
+    (function () {
+        function Snake(width, height, direction) {
+            this.width = width || 20;
+            this.height = height || 20;
+            this.direction = direction || "right";
+            this.body = [
+                {x: 3, y: 2, color: "hotpink"},
+                {x: 2, y: 2, color: "orange"},
+                {x: 1, y: 2, color: "orange"}
+            ]
+        }
+
+        //将小蛇对象暴露给window对象
+        window.Snake = Snake;
+        var elements = [];//存储小蛇身体部分
+        //小蛇的初始化
+        Snake.prototype.init = function (map) {
+            //先删除小蛇
+            remove();
+            for (var i = 0; i < this.body.length; i++) {
+                var bodyObj = this.body[i];
+                var div = document.createElement("div");
+                map.appendChild(div);
+                div.style.width = this.width + "px";
+                div.style.height = this.height + "px";//记得px
+                //               div.style.height=this.height||20;
+//                console.log( div.style.height);
+                div.style.backgroundColor = bodyObj.color;
+                div.style.position = "absolute";
+                div.style.top = bodyObj.y * this.height + "px";
+                div.style.left = this.body[i].x * this.width + "px";
+                elements.push(div);//目的找到图中的小蛇删除小蛇
+            }//for end
+
+        };
+        //小蛇移动
+        Snake.prototype.move = function (food, map) {
+            var i = this.body.length - 1;
+            //改变小蛇身体的坐标
+            for (; i > 0; i--) {
+                this.body[i].x = this.body[i - 1].x;
+                this.body[i].y = this.body[i - 1].y;
+            }
+            //改变蛇头的坐标
+            switch (this.direction) {
+                case "right":
+                    this.body[0].x += 1;
+                    break;
+                case "left":
+                    this.body[0].x -= 1;
+                    break;
+                case "top":
+                    this.body[0].y -= 1;
+                    break;
+                case "bottom":
+                    this.body[0].y += 1;
+                    break;
+
+            }
+            //获取小蛇头部横纵坐标
+            var headX=this.body[0].x*this.width;
+            var headY=this.body[0].y*this.height;
+            //判断小蛇的头部与食物坐标是否相同
+            if(headX==food.x&&headY==food.y){
+                var last=this.body[this.body.length-1];
+                this.body.push({
+                    x:last.x,
+                    y:last.y,
+                    color:last.color
+                });
+                food.init(map);
+            }
+        };//function move end
+        //私有函数，外部调用不了
+        function remove() {
+            var i = elements.length - 1;
+            for (; i >= 0; i--) {
+                //先通过elements数组找到父级元素再删除子元素  删除地图的小蛇
+                elements[i].parentNode.removeChild(elements[i]);
+                //删除数组
+                elements.splice(i, 1);
+            }
+        }
+
+
+    }());
+    //游戏封装食物小蛇实例化对象
+    (function () {
+        function Game(map) {
+            this.food = new Food;
+            this.snake = new Snake;
+            this.map = map;
+        }
+
+        var that = null;//为了保存游戏Game的实例化对象
+        window.Game = Game;
+        //游戏初始化
+        Game.prototype.init = function () {
+            var map = document.querySelector(".map");
+            this.food.init(map);
+            this.snake.init(map);
+            this.runSnake(this.food, map);
+            this.bindKey();
+
+
+        };
+        Game.prototype.runSnake = function (food, map) {
+            that = this;
+            var timeId = window.setInterval(function () {//谁（包括实例化对象）调用了这个方法this就是谁
+                this.snake.move(food, map);
+                this.snake.init(map);//顺序不能反先数值改变再移动  move init
+                var maxX = map.offsetWidth / this.snake.width;
+                var maxY = map.offsetHeight / this.snake.height;
+                //此时小蛇的坐标
+                var headX = this.snake.body[0].x;
+                var headY = this.snake.body[0].y;
+//               console.log(headX);
+//                console.log(maxX);
+                if (headX < 0 || headX >= maxX) {
+                    //撞墙游戏结束
+                    clearInterval(timeId);
+                    alert("游戏结束！");
+                }
+                if (headY < 0 || headY >= maxY) {
+                    //撞墙游戏结束
+                    clearInterval(timeId);
+                    alert("游戏结束！");
+                }
+
+            }.bind(that), 130);//bind()参数对象传进去 里面this就是那个对象
+        };
+        //绑定小蛇方向事件
+        Game.prototype.bindKey = function () {
+            document.onkeydown = function (e) {
+                switch (e.keyCode) {
+                    case 37:
+                        console.log( this.snake.direction);
+                        this.snake.direction = "left";
+                        break;
+                    case 38:
+                        this.snake.direction = "top";
+                        break;
+                    case 39:
+                        this.snake.direction = "right";
+                        break;
+                    case 40:
+                        this.snake.direction = "bottom";
+                        break;
+                }
+            }.bind(that);
+        };
+
+
+    }());
+    var game = new Game(document.querySelector(".map"));
+    game.init();
+    //测试
+    //    var food = new Food();
+    //    food.init(document.querySelector(".map"));
+    //    var snake = new Snake();
+    //    //先显示小蛇
+    //    snake.init(document.querySelector(".map"));
+    //    snake.move();
+    //    setInterval(function(){
+    //        snake.init(document.querySelector(".map"));
+    //        snake.move();
+    //    },130);
+
+</script>
+</body>
+</html>
